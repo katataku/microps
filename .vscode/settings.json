@@ -1,0 +1,7 @@
+{
+    "C_Cpp.vcFormat.newLine.beforeWhileInDoWhile": true,
+    "C_Cpp.vcFormat.space.afterComma": true,
+    "C_Cpp.vcFormat.space.afterCastCloseParenthesis": true,
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "sameLine",
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "sameLine"
+}

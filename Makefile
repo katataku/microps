@@ -3,7 +3,7 @@ APPS =
 DRIVERS = driver/dummy.o \
 
 OBJS = util.o \
-#       net.o \
+       net.o \
 
 
 TESTS = test/step0.exe \
