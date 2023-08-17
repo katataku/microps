@@ -28,25 +28,29 @@
  * Time
  */
 
-#define timeval_add_usec(x, y)         \
-    do {                               \
-        (x)->tv_sec += y / 1000000;    \
-        (x)->tv_usec += y % 1000000;   \
-        if ((x)->tv_usec >= 1000000) { \
-            (x)->tv_sec += 1;          \
-            (x)->tv_usec -= 1000000;   \
-        }                              \
-    } while(0);
+#define timeval_add_usec(x, y)       \
+    do                               \
+    {                                \
+        (x)->tv_sec += y / 1000000;  \
+        (x)->tv_usec += y % 1000000; \
+        if ((x)->tv_usec >= 1000000) \
+        {                            \
+            (x)->tv_sec += 1;        \
+            (x)->tv_usec -= 1000000; \
+        }                            \
+    } while (0);
 
-#define timespec_add_nsec(x, y)           \
-    do {                                  \
-        (x)->tv_sec += y / 1000000000;    \
-        (x)->tv_nsec += y % 1000000000;   \
-        if ((x)->tv_nsec >= 1000000000) { \
-            (x)->tv_sec += 1;             \
-            (x)->tv_nsec -= 1000000000;   \
-        }                                 \
-    } while(0);
+#define timespec_add_nsec(x, y)         \
+    do                                  \
+    {                                   \
+        (x)->tv_sec += y / 1000000000;  \
+        (x)->tv_nsec += y % 1000000000; \
+        if ((x)->tv_nsec >= 1000000000) \
+        {                               \
+            (x)->tv_sec += 1;           \
+            (x)->tv_nsec -= 1000000000; \
+        }                               \
+    } while (0);
 
 /*
  * Logging
@@ -74,7 +78,8 @@ hexdump(FILE *fp, const void *data, size_t size);
 
 struct queue_entry;
 
-struct queue_head {
+struct queue_head
+{
     struct queue_entry *head;
     struct queue_entry *tail;
     unsigned int num;
@@ -95,20 +100,15 @@ queue_foreach(struct queue_head *queue, void (*func)(void *arg, void *data), voi
  * Byteorder
  */
 
-extern uint16_t
-hton16(uint16_t h);
-extern uint16_t
-ntoh16(uint16_t n);
-extern uint32_t
-hton32(uint32_t h);
-extern uint32_t
-ntoh32(uint32_t n);
+extern uint16_t hton16(uint16_t h);
+extern uint16_t ntoh16(uint16_t n);
+extern uint32_t hton32(uint32_t h);
+extern uint32_t ntoh32(uint32_t n);
 
 /*
  * Checksum
  */
 
-extern uint16_t
-cksum16(uint16_t *addr, uint16_t count, uint32_t init);
+extern uint16_t cksum16(uint16_t *addr, uint16_t count, uint32_t init);
 
 #endif

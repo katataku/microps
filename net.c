@@ -96,6 +96,47 @@ net_device_close(struct net_device *dev)
     return 0;
 }
 
+/* NOTE: must not be call after net_run() */
+int net_device_add_iface(struct net_device *dev, struct net_iface *iface)
+{
+    struct net_iface *entry;
+
+    for (entry = dev->ifaces; entry; entry = entry->next)
+    {
+        if (entry->family == iface->family)
+        {
+            /* NOTE: For simplicity, only one iface can be added per family. */
+            errorf("already exists, dev=%s, family=%d", dev->name, entry->family);
+            return -1;
+        }
+    }
+    iface->dev = dev;
+
+    /*Exercise 7-1: デバイスのインタフェースリストの先頭にifaceを挿入*/
+    iface->next = dev->ifaces;
+    dev->ifaces = iface;
+    return 0;
+}
+
+struct net_iface *net_device_get_iface(struct net_device *dev, int family)
+{
+    /*
+    Exercise 7-2: デバイスに紐づくインタフェースを検索
+    ・デバイスのインタフェースリスト（dev->ifaces）を巡回
+    　・family が一致するインタフェースを返す
+    ・合致するインタフェースを発見できなかったら NULL を返す
+    */
+    struct net_iface *entry;
+    for (entry = dev->ifaces; entry; entry = entry->next)
+    {
+        if (entry->family == family)
+        {
+            return entry;
+        }
+    }
+    return NULL;
+}
+
 int net_device_output(struct net_device *dev, uint16_t type, const uint8_t *data, size_t len, const void *dst)
 {
     if (!NET_DEVICE_IS_UP(dev))
@@ -162,7 +203,6 @@ int net_input_handler(uint16_t type, const uint8_t *data, size_t len, struct net
             */
 
             //(1) 新しいエントリのメモリを確保（失敗したらエラーを返す）
-            struct net_protocol_queue_entry *entry;
             entry = memory_alloc(sizeof(*entry) + len);
             if (!entry)
             {
