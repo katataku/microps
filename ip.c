@@ -356,7 +356,11 @@ static void ip_input(const uint8_t *data, size_t len, struct net_device *dev)
     {
         if (hdr->protocol == protocol->type)
         {
-            protocol->handler(data, len, hdr->src, hdr->dst, iface);
+            protocol->handler((uint8_t *)hdr + hlen,
+                              total - hlen,
+                              hdr->src,
+                              hdr->dst,
+                              iface);
             return;
         }
     }
@@ -428,7 +432,7 @@ static ssize_t ip_output_core(struct ip_iface *iface,
     hdr->src = src;
     hdr->dst = dst;
 
-    memcpy(hdr + IP_HDR_SIZE_MIN, data, len);
+    memcpy(hdr + 1, data, len);
 
     debugf("dev=%s, dst=%s, protocol=%u, len=%u",
            NET_IFACE(iface)->dev->name, ip_addr_ntop(dst, addr, sizeof(addr)), protocol, total);
