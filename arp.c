@@ -20,6 +20,7 @@
 #define ARP_OP_REPLY 2
 
 #define ARP_CACHE_SIZE 32
+#define ARP_CACHE_TIMEOUT 30 /* seconds */
 
 #define ARP_CACHE_STATE_FREE 0
 #define ARP_CACHE_STATE_INCOMPLETE 1
@@ -113,7 +114,7 @@ static void arp_cache_delete(struct arp_cache *cache)
     */
     cache->state = ARP_CACHE_STATE_FREE;
     cache->pa = 0;
-    memcpy(cache->ha, 0, ETHER_ADDR_LEN);
+    bzero(cache->ha, ETHER_ADDR_LEN);
     timerclear(&(cache->timestamp));
 }
 
@@ -403,14 +404,52 @@ int arp_resolve(struct net_iface *iface, ip_addr_t pa, uint8_t *ha)
     return ARP_RESOLVE_FOUND;
 }
 
+static void arp_timer_handler(void)
+{
+    struct arp_cache *entry;
+    struct timeval now, diff;
+
+    mutex_lock(&mutex);
+    gettimeofday(&now, NULL);
+    for (entry = caches; entry < tailof(caches); entry++)
+    {
+        if (entry->state != ARP_CACHE_STATE_FREE && entry->state != ARP_CACHE_STATE_STATIC)
+        {
+
+            /*
+            Exercise 16-3: タイムアウトしたエントリの削除
+            ・エントリのタイムスタンプから現在までの経過時間を求める
+            ・タイムアウト時間（ARP_CACHE_TIMEOUT）が経過していたらエントリを削除する
+            */
+            timersub(&now, &entry->timestamp, &diff);
+            if (diff.tv_sec > ARP_CACHE_TIMEOUT)
+            { /* true (!0) or false (0) */
+                arp_cache_delete(entry);
+            }
+        }
+    }
+    mutex_unlock(&mutex);
+}
+
 int arp_init(void)
 {
+    struct timeval interval = {1, 0}; /* 1s */
+
     /*
     Exercise 13-4: プロトコルスタックにARPを登録する
     */
     if (net_protocol_register(NET_PROTOCOL_TYPE_ARP, arp_input) == -1)
     {
         errorf("net_protocol_register() failure");
+        return -1;
+    }
+
+    /*
+    Exercise 16-4: ARPのタイマーハンドラを登録
+    */
+    if (net_timer_register(interval, arp_timer_handler) == -1)
+    {
+        errorf("net_timer_register() failure");
         return -1;
     }
 }
