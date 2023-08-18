@@ -7,6 +7,8 @@
 
 #include "util.h"
 #include "net.h"
+#include "ip.h"
+#include "icmp.h"
 
 struct net_protocol
 {
@@ -230,7 +232,7 @@ int net_input_handler(uint16_t type, const uint8_t *data, size_t len, struct net
         }
     }
     /* unsupported protocol */
-
+    debugf("unsupported protocol");
     return 0;
 }
 
@@ -302,6 +304,14 @@ int net_init(void)
         return -1;
     }
 
+    /*
+    Exercise 9-5: ICMPの初期化関数を呼び出す（プロトコルスタックの初期化時にICMPが登録されるようにする）
+    */
+    if (icmp_init() == -1)
+    {
+        errorf("icmp_init() failure");
+        return -1;
+    }
     infof("initialized");
     return 0;
 }

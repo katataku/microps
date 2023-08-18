@@ -6,6 +6,7 @@ DRIVERS = driver/dummy.o \
 OBJS = util.o \
        net.o \
        ip.o \
+       icmp.o \
 
 
 TESTS = test/step0.exe \
@@ -17,6 +18,7 @@ TESTS = test/step0.exe \
         test/step6.exe \
         test/step7.exe \
         test/step8.exe \
+        test/step9.exe \
 
 CFLAGS := $(CFLAGS) -g -W -Wall -Wno-unused-parameter -iquote .
 
@@ -35,7 +37,7 @@ endif
 .SUFFIXES:
 .SUFFIXES: .c .o
 
-.PHONY: all clean
+.PHONY: all clean re
 
 all: $(APPS) $(TESTS)
 
@@ -50,3 +52,5 @@ $(TESTS): %.exe : %.o $(OBJS) $(DRIVERS) test/test.h
 
 clean:
 	rm -rf $(APPS) $(APPS:.exe=.o) $(OBJS) $(DRIVERS) $(TESTS) $(TESTS:.exe=.o)
+
+re:clean all
