@@ -10,6 +10,7 @@
 #include "util.h"
 #include "net.h"
 #include "ip.h"
+#include "arp.h"
 
 struct ip_hdr
 {
@@ -371,6 +372,7 @@ static void ip_input(const uint8_t *data, size_t len, struct net_device *dev)
 static int ip_output_device(struct ip_iface *iface, const uint8_t *data, size_t len, ip_addr_t dst)
 {
     uint8_t hwaddr[NET_DEVICE_ADDR_LEN] = {};
+    int ret;
 
     if (NET_IFACE(iface)->dev->flags & NET_DEVICE_FLAG_NEED_ARP)
     {
@@ -380,8 +382,11 @@ static int ip_output_device(struct ip_iface *iface, const uint8_t *data, size_t 
         }
         else
         {
-            errorf("arp does not implement");
-            return -1;
+            ret = arp_resolve(iface, dst, &hwaddr);
+            if (ret != ARP_RESOLVE_FOUND)
+            {
+                return ret;
+            }
         }
     }
     /*
@@ -389,7 +394,7 @@ static int ip_output_device(struct ip_iface *iface, const uint8_t *data, size_t 
     ・net_device_output() を呼び出してインタフェースに紐づくデバイスからIPデータグラムを送信
     ・net_device_output() の戻り値をこの関数の戻り値として返す
     */
-    return net_device_output(NET_IFACE(iface)->dev, NET_PROTOCOL_TYPE_IP, data, len, dst);
+    return net_device_output(NET_IFACE(iface)->dev, NET_PROTOCOL_TYPE_IP, data, len, hwaddr);
 }
 
 static ssize_t ip_output_core(struct ip_iface *iface,
