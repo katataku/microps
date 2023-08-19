@@ -80,6 +80,8 @@ int ether_transmit_helper(struct net_device *dev, uint16_t type, const uint8_t *
     struct ether_hdr *hdr;
     size_t flen, pad = 0;
 
+    debugf("function called ");
+
     hdr = (struct ether_hdr *)frame;
     memcpy(hdr->dst, dst, ETHER_ADDR_LEN);
     memcpy(hdr->src, dev->addr, ETHER_ADDR_LEN);

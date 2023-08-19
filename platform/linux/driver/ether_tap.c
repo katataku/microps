@@ -123,11 +123,14 @@ ether_tap_close(struct net_device *dev)
 static ssize_t
 ether_tap_write(struct net_device *dev, const uint8_t *frame, size_t flen)
 {
+    debugf("function called ");
+    debugf("fd:%d, flen:%zu", PRIV(dev)->fd, flen);
     return write(PRIV(dev)->fd, frame, flen);
 }
 
 int ether_tap_transmit(struct net_device *dev, uint16_t type, const uint8_t *buf, size_t len, const void *dst)
 {
+    debugf("function called ");
     return ether_transmit_helper(dev, type, buf, len, dst, ether_tap_write);
 }
 
