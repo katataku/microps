@@ -246,11 +246,7 @@ arp_request(struct net_iface *iface, ip_addr_t tpa)
     ・あて先はデバイスに設定されているブロードキャストアドレスとする
     ・デバイスの送信間関数の戻り値をこの関数の戻り値とする
     */
-    return iface->dev->ops->transmit(iface->dev,
-                                     NET_PROTOCOL_TYPE_ARP,
-                                     &request,
-                                     sizeof(request),
-                                     iface->dev->broadcast);
+    return net_device_output(iface->dev, ETHER_TYPE_ARP, (uint8_t *)&request, sizeof(request), iface->dev->broadcast);
 }
 
 static int

@@ -546,7 +546,7 @@ tcp_input(const uint8_t *data, size_t len, ip_addr_t src, ip_addr_t dst, struct 
     Exercise 22-4: アドレスのチェック
     ・送信元または宛先どちらかのアドレスがブロードキャストアドレスだった場合にはエラーメッセージを出力して中断する
     */
-    if (src == iface->broadcast || dst == iface->broadcast)
+    if (src == IP_ADDR_BROADCAST || src == iface->broadcast || dst == IP_ADDR_BROADCAST || dst == iface->broadcast)
     {
         errorf("broad cast addr error");
         return;

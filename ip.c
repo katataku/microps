@@ -561,20 +561,19 @@ static ssize_t ip_output_core(struct ip_iface *iface,
     　　　・チェックサム計算の際、あらかじめチェックサムフィールドに 0 を設定するのを忘れずに
     (2) IPヘッダの直後にデータを配置（コピー）する
     */
-    hlen = IP_HDR_SIZE_MIN >> 2;
-    total = IP_HDR_SIZE_MIN + len;
-
-    hdr->vhl = (IP_VERSION_IPV4 << 4) | (hlen);
+    hlen = sizeof(*hdr);
+    hdr->vhl = (IP_VERSION_IPV4 << 4) | (hlen >> 2);
     hdr->tos = 0;
-    hdr->ttl = 255;
+    total = hlen + len;
     hdr->total = hton16(total);
     hdr->id = hton16(id);
     hdr->offset = hton16(offset);
+    hdr->ttl = 0xff;
     hdr->protocol = protocol;
     hdr->sum = 0;
-    hdr->sum = cksum16(hdr, IP_HDR_SIZE_MIN, 0);
     hdr->src = src;
     hdr->dst = dst;
+    hdr->sum = cksum16((uint16_t *)hdr, hlen, 0); /* don't convert bytoder */
 
     memcpy(hdr + 1, data, len);
 
