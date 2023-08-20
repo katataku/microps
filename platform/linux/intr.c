@@ -181,7 +181,6 @@ int intr_init(void)
     sigaddset(&sigmask, SIGHUP);
     sigaddset(&sigmask, SIGUSR1);
     sigaddset(&sigmask, SIGUSR2);
-
     sigaddset(&sigmask, SIGALRM);
 
     return 0;
