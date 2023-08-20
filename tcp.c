@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <errno.h>
 
 #include "platform.h"
 
@@ -127,6 +128,7 @@ static void tcp_dump(const uint8_t *data, size_t len)
     fprintf(stderr, "        wnd: %u\n", ntoh16(hdr->wnd));
     fprintf(stderr, "        sum: 0x%04x\n", ntoh16(hdr->sum));
     fprintf(stderr, "         up: %u\n", ntoh16(hdr->up));
+#define HEXDUMP
 #ifdef HEXDUMP
     hexdump(stderr, data, len);
 #endif
@@ -223,6 +225,37 @@ static int tcp_pcb_id(struct tcp_pcb *pcb)
     return indexof(pcbs, pcb);
 }
 
+int verify_checksum(const uint8_t *data,
+                    size_t len,
+                    ip_addr_t src,
+                    ip_addr_t dst)
+{
+    struct tcp_hdr *hdr;
+    struct pseudo_hdr pseudo;
+    uint16_t psum;
+
+    if (len < sizeof(*hdr))
+    {
+        errorf("too short");
+        return -1;
+    }
+    hdr = (struct tcp_hdr *)data;
+
+    pseudo.src = src;
+    pseudo.dst = dst;
+    pseudo.zero = 0;
+    pseudo.protocol = IP_PROTOCOL_TCP;
+    pseudo.len = hton16(len);
+    psum = ~cksum16((uint16_t *)&pseudo, sizeof(pseudo), 0);
+    if (cksum16((uint16_t *)hdr, len, psum) != 0)
+    {
+        errorf("checksum error: sum=0x%04x, verify=0x%04x", ntoh16(hdr->sum), ntoh16(cksum16((uint16_t *)hdr, len, -hdr->sum + psum)));
+        return -1;
+    }
+    debugf("vallid checksum");
+    return 0;
+}
+
 static ssize_t
 tcp_output_segment(uint32_t seq,
                    uint32_t ack,
@@ -274,6 +307,12 @@ tcp_output_segment(uint32_t seq,
            total, len);
     tcp_dump((uint8_t *)hdr, total);
 
+    if (verify_checksum(hdr, total, local->addr, foreign->addr) != 0)
+    {
+        errorf("verify_checksum() failure");
+        return -1;
+    }
+
     /*
     Exercise 23-2: IPの送信関数を呼び出す
     */
@@ -308,6 +347,7 @@ static void
 tcp_segment_arrives(struct tcp_segment_info *seg, uint8_t flags, uint8_t *data, size_t len, struct ip_endpoint *local, struct ip_endpoint *foreign)
 {
     struct tcp_pcb *pcb;
+    debugf("func called");
 
     pcb = tcp_pcb_select(local, foreign);
     if (!pcb || pcb->state == TCP_PCB_STATE_CLOSED)
@@ -326,7 +366,139 @@ tcp_segment_arrives(struct tcp_segment_info *seg, uint8_t flags, uint8_t *data, 
         }
         return;
     }
-    /* implemented in the next step */
+    switch (pcb->state)
+    {
+    case TCP_PCB_STATE_LISTEN:
+        /*
+         * 1st check for an RST
+         */
+        if (TCP_FLG_ISSET(flags, TCP_FLG_RST))
+        {
+            return;
+        }
+
+        /*
+         * 2nd check for an ACK
+         */
+        if (TCP_FLG_ISSET(flags, TCP_FLG_ACK))
+        {
+            tcp_output_segment(seg->ack, 0, TCP_FLG_RST, 0, NULL, 0, local, foreign);
+            return;
+        }
+
+        /*
+         * 3rd check for an SYN
+         */
+        if (TCP_FLG_ISSET(flags, TCP_FLG_SYN))
+        {
+            debugf("LISTEN & SYN");
+            /* ignore: security/compartment check */
+            /* ignore: precedence check */
+            pcb->local = *local;
+            pcb->foreign = *foreign;
+            pcb->rcv.wnd = sizeof(pcb->buf);
+            pcb->rcv.nxt = seg->seq + 1;
+            pcb->irs = seg->seq;
+            pcb->iss = random();
+            tcp_output(pcb, TCP_FLG_SYN | TCP_FLG_ACK, NULL, 0);
+            pcb->snd.nxt = pcb->iss + 1;
+            pcb->snd.una = pcb->iss;
+            pcb->state = TCP_PCB_STATE_SYN_RECEIVED;
+            /* ignore: Note that any other incoming control or data             */
+            /* (combined with SYN) will be processed in the SYN-RECEIVED state, */
+            /* but processing of SYN and ACK  should not be repeated            */
+            return;
+        }
+
+        /*
+         * 4th other text or control
+         */
+
+        /* drop segment */
+        return;
+    case TCP_PCB_STATE_SYN_SENT:
+        /*
+         * 1st check the ACK bit
+         */
+
+        /*
+         * 2nd check the RST bit
+         */
+
+        /*
+         * 3rd check security and precedence (ignore)
+         */
+
+        /*
+         * 4th check the SYN bit
+         */
+
+        /*
+         * 5th, if neither of the SYN or RST bits is set then drop the segment and return
+         */
+
+        /* drop segment */
+        return;
+    }
+    /*
+     * Otherwise
+     */
+
+    /*
+     * 1st check sequence number
+     */
+
+    /*
+     * 2nd check the RST bit
+     */
+
+    /*
+     * 3rd check security and precedence (ignore)
+     */
+
+    /*
+     * 4th check the SYN bit
+     */
+
+    /*
+     * 5th check the ACK field
+     */
+    if (!TCP_FLG_ISSET(flags, TCP_FLG_ACK))
+    {
+        debugf("!TCP_FLG_ISSET(flags, TCP_FLG_ACK)");
+        /* drop segment */
+        return;
+    }
+    switch (pcb->state)
+    {
+    case TCP_PCB_STATE_SYN_RECEIVED:
+        debugf("TCP_PCB_STATE_SYN_RECEIVED");
+        if (pcb->snd.una <= seg->ack && seg->ack <= pcb->snd.nxt)
+        {
+            pcb->state = TCP_PCB_STATE_ESTABLISHED;
+            sched_wakeup(&pcb->ctx);
+        }
+        else
+        {
+            tcp_output_segment(seg->ack, 0, TCP_FLG_RST, 0, NULL, 0, local, foreign);
+            return;
+        }
+        break;
+    }
+
+    /*
+     * 6th, check the URG bit (ignore)
+     */
+
+    /*
+     * 7th, process the segment text
+     */
+
+    /*
+     * 8th, check the FIN bit
+     */
+
+    return;
 }
 
 static void
@@ -352,6 +524,12 @@ tcp_input(const uint8_t *data, size_t len, ip_addr_t src, ip_addr_t dst, struct 
     Exercise 22-3: チェックサムの検証
     ・UDPと同様に疑似ヘッダを含めて計算する
     */
+    if (verify_checksum(hdr, len, src, dst) != 0)
+    {
+        errorf("verify_checksum() failure");
+        return -1;
+    }
+
     pseudo.src = src;
     pseudo.dst = dst;
     pseudo.zero = 0;
@@ -404,6 +582,20 @@ tcp_input(const uint8_t *data, size_t len, ip_addr_t src, ip_addr_t dst, struct 
 
     return;
 }
+static void event_handler(void *arg)
+{
+    struct tcp_pcb *pcb;
+
+    mutex_lock(&mutex);
+    for (pcb = pcbs; pcb < tailof(pcbs); pcb++)
+    {
+        if (pcb->state != TCP_PCB_STATE_FREE)
+        {
+            sched_interrupt(&pcb->ctx);
+        }
+    }
+    mutex_unlock(&mutex);
+}
 
 int tcp_init(void)
 {
@@ -412,5 +604,94 @@ int tcp_init(void)
     */
 
     ip_protocol_register(IP_PROTOCOL_TCP, tcp_input);
+    net_event_subscribe(event_handler, NULL);
+    return 0;
+}
+
+/*
+ * TCP User Command (RFC793)
+ */
+
+int tcp_open_rfc793(struct ip_endpoint *local, struct ip_endpoint *foreign, int active)
+{
+    struct tcp_pcb *pcb;
+    char ep1[IP_ENDPOINT_STR_LEN];
+    char ep2[IP_ENDPOINT_STR_LEN];
+    int state, id;
+
+    mutex_lock(&mutex);
+    pcb = tcp_pcb_alloc();
+    if (!pcb)
+    {
+        errorf("tcp_pcb_alloc() failure");
+        mutex_unlock(&mutex);
+        return -1;
+    }
+    if (active)
+    {
+        errorf("active open does not implement");
+        tcp_pcb_release(pcb);
+        mutex_unlock(&mutex);
+        return -1;
+    }
+    else
+    {
+        debugf("passive open: local=%s, waiting for connection...", ip_endpoint_ntop(local, ep1, sizeof(ep1)));
+        pcb->local = *local;
+        if (foreign)
+        {
+            pcb->foreign = *foreign;
+        }
+        pcb->state = TCP_PCB_STATE_LISTEN;
+    }
+AGAIN:
+    state = pcb->state;
+    /* waiting for state changed */
+    while (pcb->state == state)
+    {
+        if (sched_sleep(&pcb->ctx, &mutex, NULL) == -1)
+        {
+            debugf("interrupted");
+            pcb->state = TCP_PCB_STATE_CLOSED;
+            tcp_pcb_release(pcb);
+            mutex_unlock(&mutex);
+            errno = EINTR;
+            return -1;
+        }
+    }
+    if (pcb->state != TCP_PCB_STATE_ESTABLISHED)
+    {
+        if (pcb->state == TCP_PCB_STATE_SYN_RECEIVED)
+        {
+            goto AGAIN;
+        }
+        errorf("open error: %d", pcb->state);
+        pcb->state = TCP_PCB_STATE_CLOSED;
+        tcp_pcb_release(pcb);
+        mutex_unlock(&mutex);
+        return -1;
+    }
+    id = tcp_pcb_id(pcb);
+    debugf("connection established: local=%s, foreign=%s",
+           ip_endpoint_ntop(&pcb->local, ep1, sizeof(ep1)), ip_endpoint_ntop(&pcb->foreign, ep2, sizeof(ep2)));
+    mutex_unlock(&mutex);
+    return id;
+}
+
+int tcp_close(int id)
+{
+    struct tcp_pcb *pcb;
+
+    mutex_lock(&mutex);
+    pcb = tcp_pcb_get(id);
+    if (!pcb)
+    {
+        errorf("pcb not found");
+        mutex_unlock(&mutex);
+        return -1;
+    }
+    tcp_output(pcb, TCP_FLG_RST, NULL, 0);
+    tcp_pcb_release(pcb);
+    mutex_unlock(&mutex);
     return 0;
 }
